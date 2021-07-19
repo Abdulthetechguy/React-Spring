@@ -1,7 +1,7 @@
 var path = require('path');
 
 module.exports = {
-    entry: './src/main/js/app.js',
+    entry: './src/App.js',
     devtool: 'sourcemaps',
     cache: true,
 	mode: 'development',
@@ -12,7 +12,7 @@ module.exports = {
     },
     output: {
         path: __dirname,
-        filename: './src/main/resources/static/built/bundle.js'
+        filename: './src/built/bundle.js'
     },
 	module: {
 		rules: [

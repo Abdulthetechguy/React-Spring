@@ -20,6 +20,8 @@
   },
   "homepage": "https://github.com/spring-guides/tut-react-and-spring-data-rest",
   "dependencies": {
+    "@testing-library/jest-dom": "^5.14.1",
+    "@testing-library/react": "^12.0.0",
     "react": "^16.5.2",
     "react-dom": "^16.5.2",
     "react-scripts": "^4.0.3",
@@ -33,11 +35,32 @@
     "test": "react-scripts test",
     "watch": "webpack --watch -d --output ./target/classes/static/built/bundle.js"
   },
+  "eslintConfig": {
+    "extends": [
+      "spring-data-rest-and-reactjs",
+      "spring-data-rest-and-reactjs/jest"
+    ]
+  },
   "devDependencies": {
     "@babel/core": "^7.1.0",
     "@babel/preset-env": "^7.1.0",
     "@babel/preset-react": "^7.0.0",
+    "enzyme": "^3.11.0",
+    "enzyme-adapter-react-16": "^1.15.6",
+    "react-test-renderer": "^17.0.2",
     "webpack": "^4.19.1",
     "webpack-cli": "^3.1.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   }
 }
