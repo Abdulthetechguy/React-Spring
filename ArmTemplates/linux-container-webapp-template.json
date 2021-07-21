@@ -1,0 +1,253 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "webAppName": {
+            "type": "String"
+        },
+        "hostingPlanName": {
+            "type": "String"
+        },
+        "appInsightsLocation": {
+            "type": "String"
+        },
+        "sku": {
+            "defaultValue": "Standard",
+            "type": "String"
+        },
+        "registryName": {
+            "type": "String"
+        },
+        "imageName": {
+            "type":"String"
+        },
+        "registryLocation": {
+            "type": "String"
+        },
+        "registrySku": {
+            "defaultValue": "Standard",
+            "type": "String"
+        },
+        "minimumCapacity": {
+            "type": "Int",
+            "defaultValue": 1,
+            "metadata": {
+              "description": "The minimum capacity.  Autoscale engine will ensure the instance count is at least this value."
+            }
+    },
+    "maximumCapacity": {
+      "type": "Int",
+      "defaultValue": 3,
+      "metadata": {
+        "description": "The maximum capacity.  Autoscale engine will ensure the instance count is not greater than this value."
+      }
+    },
+    "defaultCapacity": {
+      "type": "Int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "The default capacity.  Autoscale engine will preventively set the instance count to be this value if it can not find any metric data."
+      }
+    },
+    "metricName": {
+      "type": "string",
+      "defaultValue": "CpuPercentage",
+      "metadata": {
+        "description": "The metric name."
+      }
+    },
+    "metricThresholdToScaleOut": {
+      "type": "Int",
+      "defaultValue": 70,
+      "metadata": {
+        "description": "The metric upper threshold.  If the metric value is above this threshold then autoscale engine will initiate scale out action."
+      }
+    },
+    "metricThresholdToScaleIn": {
+      "type": "Int",
+      "defaultValue": 30,
+      "metadata": {
+        "description": "The metric lower threshold.  If the metric value is below this threshold then autoscale engine will initiate scale in action."
+      }
+    },
+    "changePercentScaleOut": {
+      "type": "Int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "The percentage to increase the instance count when autoscale engine is initiating scale out action."
+      }
+    },
+    "changePercentScaleIn": {
+      "type": "Int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "The percentage to decrease the instance count when autoscale engine is initiating scale in action."
+      }
+    },
+    "autoscaleEnabled": {
+      "type": "Bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "A boolean to indicate whether the autoscale policy is enabled or disabled."
+      }
+    },
+        "startupCommand": {
+            "defaultValue": "",
+            "type": "String"
+        }
+    },
+    "variables": {
+        "settingName": "[concat(toLower(parameters('hostingPlanName')), '-setting')]",
+        "targetResourceId": "[resourceId('Microsoft.Web/serverFarms/', parameters('hostingPlanName'))]" 
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/sites",
+            "name": "[parameters('webAppName')]",
+            "apiVersion": "2016-03-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "[concat('hidden-related:', '/subscriptions/', subscription().subscriptionId,'/resourcegroups/', resourceGroup().name, '/providers/Microsoft.Web/serverfarms/', parameters('hostingPlanName'))]": "empty"
+            },
+            "properties": {
+                "name": "[parameters('webAppName')]",
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "DOCKER_REGISTRY_SERVER_URL",
+                            "value": "[concat('https://', reference(concat('Microsoft.ContainerRegistry/registries/', parameters('registryName'))).loginServer)]"
+                        },
+                        {
+                            "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+                            "value": "[listCredentials(concat('Microsoft.ContainerRegistry/registries/', parameters('registryName')), '2017-10-01').username]"
+                        },
+                        {
+                            "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
+                            "value": "[listCredentials(concat('Microsoft.ContainerRegistry/registries/', parameters('registryName')), '2017-10-01').passwords[0].value]"
+                        },
+                        {
+                            "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+                            "value": "false"
+                        },
+                        {
+                            "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+                            "value": "[reference(resourceId('microsoft.insights/components/', parameters('webAppName')), '2015-05-01').InstrumentationKey]"
+                        }
+                    ],
+                    "appCommandLine": "[parameters('startupCommand')]",
+                    "linuxFxVersion": "[concat('DOCKER|', reference(concat('Microsoft.ContainerRegistry/registries/', parameters('registryName'))).loginServer, '/', parameters('imageName'))]"
+                },
+                "serverFarmId": "[concat('/subscriptions/', subscription().subscriptionId,'/resourcegroups/', resourceGroup().name, '/providers/Microsoft.Web/serverfarms/', parameters('hostingPlanName'))]",
+                "hostingEnvironment": ""
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Web/serverfarms/', parameters('hostingPlanName'))]",
+                "[resourceId('microsoft.insights/components/', parameters('webAppName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.ContainerRegistry/registries",
+            "sku": {
+                "name": "[parameters('registrySku')]"
+            },
+            "name": "[parameters('registryName')]",
+            "apiVersion": "2017-10-01",
+            "location": "[parameters('registryLocation')]",
+            "properties": {
+                "adminUserEnabled": true
+            }
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "sku": {
+                "Tier": "[first(skip(split(parameters('sku'), ' '), 1))]",
+                "Name": "[first(split(parameters('sku'), ' '))]"
+            },
+            "kind": "linux",
+            "name": "[parameters('hostingPlanName')]",
+            "apiVersion": "2016-09-01",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "name": "[parameters('hostingPlanName')]",
+                "workerSizeId": "0",
+                "reserved": true,
+                "numberOfWorkers": "1",
+                "hostingEnvironment": ""
+            }
+        },
+        {
+            "type": "Microsoft.Insights/components",
+            "name": "[parameters('webAppName')]",
+            "apiVersion": "2014-04-01",
+            "location": "[parameters('appInsightsLocation')]",
+            "tags": {
+                "[concat('hidden-link:', resourceGroup().id, '/providers/Microsoft.Web/sites/', parameters('webAppName'))]": "Resource"
+            },
+            "properties": {
+                "applicationId": "[parameters('webAppName')]",
+                "Request_Source": "AzureTfsExtensionAzureProject"
+            }
+        },
+         {
+        "type": "Microsoft.Insights/autoscalesettings",
+        "name": "[variables('settingName')]",
+        "dependsOn": [
+          "[resourceId('Microsoft.Web/serverfarms', parameters('hostingPlanName'))]"
+        ],
+        "apiVersion": "2014-04-01",
+        "location": "[parameters('appInsightsLocation')]",
+        "properties": {
+          "profiles": [
+            {
+              "name": "DefaultAutoscaleProfile",
+              "capacity": {
+                "minimum": "[parameters('minimumCapacity')]",
+                "maximum": "[parameters('maximumCapacity')]",
+                "default": "[parameters('defaultCapacity')]"
+              },
+              "rules": [
+                {
+                  "metricTrigger": {
+                    "metricName": "[parameters('metricName')]",
+                    "metricResourceUri": "[variables('targetResourceId')]",
+                    "timeGrain": "PT5M",
+                    "statistic": "Average",
+                    "timeWindow": "PT10M",
+                    "timeAggregation": "Average",
+                    "operator": "GreaterThan",
+                    "threshold": "[parameters('metricThresholdToScaleOut')]"
+                  },
+                  "scaleAction": {
+                    "direction": "Increase",
+                    "type": "ChangeCount",
+                    "value": "[parameters('changePercentScaleOut')]",
+                    "cooldown": "PT10M"
+                  }
+                },
+                {
+                  "metricTrigger": {
+                    "metricName": "[parameters('metricName')]",
+                    "metricResourceUri": "[variables('targetResourceId')]",
+                    "timeGrain": "PT5M",
+                    "statistic": "Average",
+                    "timeWindow": "PT10M",
+                    "timeAggregation": "Average",
+                    "operator": "LessThan",
+                    "threshold": "[parameters('metricThresholdToScaleIn')]"
+                  },
+                  "scaleAction": {
+                    "direction": "Decrease",
+                    "type": "ChangeCount",
+                    "value": "[parameters('changePercentScaleIn')]",
+                    "cooldown": "PT10M"
+                  }
+                }
+              ]
+            }
+          ],
+          "enabled": "[parameters('autoscaleEnabled')]",
+          "targetResourceUri": "[variables('targetResourceId')]"
+        }
+      }
+    ]
+}
