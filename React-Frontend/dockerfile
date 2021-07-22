@@ -1,0 +1,14 @@
+FROM node:10
+WORKDIR /usr/src/app
+COPY package*.json ./
+
+#RUN npm install
+ 
+# Copies everything over to Docker environment
+COPY . .
+ 
+# Uses port which is used by the actual application
+EXPOSE 3000
+ 
+# Finally runs the application
+CMD [ "npm", "start" ]

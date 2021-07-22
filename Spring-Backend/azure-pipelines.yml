@@ -1,0 +1,234 @@
+trigger:
+  branches:
+    include: 
+    - main
+variables: 
+  buildConfiguration: 'Release'
+  location: 'West US' #Change this to your RG location
+  acrHostName: 'capex21.azurecr.io' #Change this to your ACR Host Name
+  acrName: 'capex21'
+  rgName: 'cape-rg' # Chnage this to your RG
+  imageName: 'capex21'
+  webAppName: 'capex21'
+  subscription: 'ADSOC' #Update this ARM service connection Created
+  RegistryConnect: 'ACRConnect' #Update this to the Docker Registry connection Created
+  tag: 'latest'
+  dbserver: 'springdb2021'
+  dbusername: 'mysqladmin'
+  #dbpassword:  #Minimum 8 character Long. A secret variable has been used
+
+
+stages:
+
+# Build Stage
+- stage: BuildAndTest
+  jobs:
+  - job: BuildAndTest
+    pool:
+      vmImage: 'Ubuntu-latest'
+    steps:
+
+
+# Create or update the ACR resource
+    - task: AzureResourceGroupDeployment@2
+      displayName: 'Azure Deployment:Create Azure Container Registry'
+      inputs:
+        azureSubscription: '$(subscription)'
+        resourceGroupName: '$(rgName)'
+        location: $(location)
+        csmFile: '$(System.DefaultWorkingDirectory)/**/azure-container-registry-template.json'
+        overrideParameters: '-registryName "$(acrName)" -registryLocation "$(location)" -registrySku standard'
+
+# Create MySQL Database
+    - task: AzureResourceGroupDeployment@2
+      displayName: 'Azure Deployment:Create Azure Container Registry'
+      inputs:
+        azureSubscription: '$(subscription)'
+        resourceGroupName: '$(rgName)'
+        location: $(location)
+        csmFile: '$(System.DefaultWorkingDirectory)/**/azure-mysql-template.json'
+        overrideParameters: '-serverName "$(dbserver)" -administratorLogin "$(dbusername)" -administratorLoginPassword "$(dbpassword)"'
+
+     
+        
+
+#Login to ACR
+    - task: Docker@2
+      displayName: Login to ACR
+      inputs:
+        command: login
+        containerRegistry: '$(RegistryConnect)'
+
+#Build java Artifact
+    - task: Maven@3
+      displayName: Maven Build  
+      inputs:
+        mavenPomFile: 'react-and-spring-data-rest/pom.xml'
+        mavenOptions: '-Xmx3072m'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.8'
+        jdkArchitectureOption: 'x64'
+        publishJUnitResults: false
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        goals: 'package -Dmaven.test.skip=true'
+
+# Build and push image to ACR
+    - task: Docker@2
+      displayName: Build and Push
+      inputs:
+        command: buildAndPush
+        Dockerfile: '**/Dockerfile'
+        repository: '$(imageName)'
+        tags: '$(tag)'
+
+ # Copy ARM templates
+    - task: CopyFiles@2
+      displayName: 'Copy ARM templates'
+      inputs:
+        SourceFolder: ArmTemplates
+        TargetFolder: '$(build.artifactstagingdirectory)'
+
+    # Publish the app as an artifact
+    - publish: $(Build.StagingDirectory)
+      artifact: app
+
+
+# Dev release
+- stage: DEV
+  displayName: Release to DEV 
+  jobs:
+  - job: Release
+    pool:
+      vmImage: 'Ubuntu-latest'
+    steps:
+    # Don't clone the repo
+    - checkout: none
+
+    # Download the published application artifact
+    - download: current
+      artifact: app
+
+    # Create or update Azure App Service
+    - task: AzureResourceGroupDeployment@2
+      displayName: 'Azure Deployment:Create DEV Azure App Service'
+      inputs:
+        azureSubscription: '$(subscription)'
+        resourceGroupName: '$(rgName)'
+        location: '$(location)'
+        csmFile: '$(Pipeline.Workspace)/**/linux-container-webapp-template.json'
+        overrideParameters: '-webAppName "$(webAppName)-dev" -hostingPlanName $(webAppName) -appInsightsLocation "$(location)" -sku "S1 Standard" -registryName $(acrName) -registryLocation "$(location)" -registrySku standard -imageName $(imageName):$(tag)'
+
+    # Deploy App Service
+    - task: AzureRmWebAppDeployment@3
+      displayName: 'Deploy Azure App Service to Dev'
+      inputs:
+        azureSubscription: '$(subscription)'
+        appType: applinux
+        WebAppName: "$(webAppName)-dev"
+        DockerNamespace: $(acrHostName)
+        DockerRepository: $(webAppName)
+        DockerImageTag: '$(tag)'
+        WebAppUri: webAppUrl
+        TakeAppOfflineFlag: true
+        UseWebDeploy: true
+        RenameFilesFlag: true
+
+
+#Staging release
+- stage: STG
+  displayName: Release to STG 
+  jobs:
+  - job: Release
+    pool:
+      vmImage: 'Ubuntu-latest'
+    steps:
+    # Don't clone the repo
+    - checkout: none
+
+    # Download the published application artifact
+    - download: current
+      artifact: app
+
+    # Create or update Azure App Service
+    - task: AzureResourceGroupDeployment@2
+      displayName: 'Azure Deployment:Create STG Azure App Service'
+      inputs:
+        azureSubscription: '$(subscription)'
+        resourceGroupName: '$(rgName)'
+        location: '$(location)'
+        csmFile: '$(Pipeline.Workspace)/**/linux-container-webapp-template.json'
+        overrideParameters: '-webAppName "$(webAppName)-stg" -hostingPlanName $(webAppName) -appInsightsLocation "$(location)" -sku "S1 Standard" -registryName $(acrName) -registryLocation "$(location)" -registrySku standard -imageName $(imageName):$(tag)'
+
+    # Deploy App Service
+    - task: AzureRmWebAppDeployment@3
+      displayName: 'Deploy Azure App Service to STG'
+      inputs:
+        azureSubscription: '$(subscription)'
+        appType: applinux
+        WebAppName: "$(webAppName)-stg"
+        DockerNamespace: $(acrHostName)
+        DockerRepository: $(webAppName)
+        DockerImageTag: '$(tag)'
+        WebAppUri: webAppUrl
+        TakeAppOfflineFlag: true
+        UseWebDeploy: true
+        RenameFilesFlag: true
+
+#PRD release
+- stage: PRD
+  displayName: Release to PRD
+  jobs:
+  - job: Release
+    pool:
+      vmImage: 'Ubuntu-latest'
+    steps:
+    # Don't clone the repo
+    - checkout: none
+
+    # Download the published application artifact
+    - download: current
+      artifact: app
+
+    # Create or update Azure App Service
+    - task: AzureResourceGroupDeployment@2
+      displayName: 'Azure Deployment:Create PRD Azure App Service'
+      inputs:
+        azureSubscription: '$(subscription)'
+        resourceGroupName: '$(rgName)'
+        location: '$(location)'
+        csmFile: '$(Pipeline.Workspace)/**/linux-container-webapp-template.json'
+        overrideParameters: '-webAppName "$(webAppName)-prd" -hostingPlanName $(webAppName) -appInsightsLocation "$(location)" -sku "S1 Standard" -registryName $(acrName) -registryLocation "$(location)" -registrySku standard -imageName $(imageName):$(tag)'
+
+    # Deploy App Service
+    - task: AzureRmWebAppDeployment@3
+      displayName: 'Deploy Azure App Service to PRD'
+      inputs:
+        azureSubscription: '$(subscription)'
+        appType: applinux
+        WebAppName: "$(webAppName)-prd"
+        DockerNamespace: $(acrHostName)
+        DockerRepository: $(webAppName)
+        DockerImageTag: '$(tag)'
+        WebAppUri: webAppUrl
+        TakeAppOfflineFlag: true
+        UseWebDeploy: true
+        RenameFilesFlag: true
+
+#Destroy Infra
+- stage: DestroyEnvironment
+  displayName: Destroy Infrastructure
+  jobs:
+  - deployment: DestroyAll
+    environment: 'Destroy'
+    strategy:
+     runOnce:
+       deploy:
+         steps:
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: '$(subscription)'
+              scriptType: 'pscore'
+              scriptLocation: 'inlineScript'
+              inlineScript: 'az group delete --name $(rgName) --yes'
+              powerShellErrorActionPreference: 'silentlyContinue'
+         
