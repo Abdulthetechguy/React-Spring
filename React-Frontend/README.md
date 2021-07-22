@@ -1,29 +1,16 @@
 # react-and-spring-data-rest
 
-The application has a react frontend and a Spring Boot Rest API, packaged as a single module Maven application.
+## To run the app
+ 
+`npm install` to install the dependencies 
+`npm start` to start the app
 
-You can build the application running (`./mvnw clean verify`), that will generate a Spring Boot flat JAR in the target folder.
 
-To start the application you can just run (`java -jar target/react-and-spring-data-rest-*.jar`), then you can call the API by using the following curl (shown with its output):
+# run the test 
+`npm run test`
 
----
+## To see the frontend, navigate to 
 
-\$ curl -v -u greg:turnquist localhost:8080/api/employees/1
-{
-"firstName" : "Frodo",
-"lastName" : "Baggins",
-"description" : "ring bearer",
-"manager" : {
-"name" : "greg",
-"roles" : [ "ROLE_MANAGER" ]
-},
-"\_links" : {
-"self" : {
-"href" : "http://localhost:8080/api/employees/1"
-}
-}
-}
+http://localhost:3000/spring-guides/tut-react-and-spring-data-rest#. 
 
----
-
-To see the frontend, navigate to http://localhost:8080. You are immediately redirected to a login form. Log in as `greg/turnquist`
+You are immediately redirected to a login form. Log in as `greg/turnquist`

@@ -465,10 +465,10 @@ class Employee extends React.Component {
 }
 
 
-ReactDOM.render(
-	<App loggedInManager={document.getElementById('managername').innerHTML } />,
-	document.getElementById('react')
-)
+// ReactDOM.render(
+// 	<App loggedInManager={document.getElementById('managername').innerHTML } />,
+// 	document.getElementById('react')
+// )
 
 export default App;
 

@@ -1,18 +1,19 @@
 import { render, screen } from '@testing-library/react';
+import { configure } from "enzyme";
+import { shallow } from 'enzyme';
+import Adapter from "enzyme-adapter-react-16";
+configure({ adapter: new Adapter() });
+
 import App from './App';
 
-test('renders hello', () => {
-  render(<App />);
-  const linkElement = screen.getByText(/Hello/i);
-  expect(linkElement).toBeInTheDocument();
+test('renders create button', () => {
+    render(<App />);
+    const linkElement = screen.getAllByText("Create");
+    expect(document.querySelector("a").getAttribute("href")).toBe("#createEmployee")
 });
 
 it("renders without crashing", () => {
   shallow(<App />);
+ 
 });
 
-// it("renders Account header", () => {
-//   const wrapper = shallow(<App />);
-//   const welcome = <h1>Display Active Users Account Details</h1>;
-//   expect(wrapper.contains(welcome)).toEqual(true);
-// });

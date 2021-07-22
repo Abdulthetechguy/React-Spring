@@ -35,10 +35,9 @@
     "test": "react-scripts test",
     "watch": "webpack --watch -d --output ./target/classes/static/built/bundle.js"
   },
-  "eslintConfig": {
+   "eslintConfig": {
     "extends": [
-      "spring-data-rest-and-reactjs",
-      "spring-data-rest-and-reactjs/jest"
+     
     ]
   },
   "devDependencies": {
